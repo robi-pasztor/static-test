@@ -1,91 +1,103 @@
-import { products } from './data.js';
 
-function createNewTextElement(type, id, string) {
-    const newElement = document.createElement(type);
-    if (id) {
-        newElement.id = id;
-    }
-    newElement.innerText = string;
-    return newElement;
-}
+/* eslint-disable consistent-return */
+const CARSURL = "/api/products";
 
-function addRoot() {
-    const rootElement = createNewTextElement("div", "root", "");
-    document.body.appendChild(rootElement);
-}
-
-function createAlbums(albums, parent) {
-    for (const album of albums) {
-        const albumDiv = createNewTextElement("div", "", "");
-        const albumHeading = createNewTextElement("h2", "", album.name);
-        const skuParag = createNewTextElement("p", "", album.sku);
-        const idHeading = createNewTextElement("h4", "", album.id);
-        albumDiv.appendChild(albumHeading);
-        albumDiv.appendChild(skuParag);
-        albumDiv.appendChild(idHeading);
-        createTracks(album.details, albumDiv);
-        parent.appendChild(albumDiv);
-    }
-}
-
-function createTracks(tracks, parent) {
-    for (const track of tracks) {
-        const trackDiv = createNewTextElement("div", "", "");
-        const trackHeading = createNewTextElement("h4", "", track.name);
-        const trackID = createNewTextElement("h4", "", track.track_id);
-        const trackPrice = createNewTextElement("p", "", track.unit_price);
-        trackDiv.appendChild(trackHeading);
-        trackDiv.appendChild(trackID);
-        trackDiv.appendChild(trackPrice);
-        parent.appendChild(trackDiv);
-    }
-}
-
-function getAlbumsLessThan(albums, maxPrice) {
-    const lessAlbums = albums.filter((album) => album.price < maxPrice);
-    return lessAlbums;
-}
-
-function getAlbumsStartingWith(albums, letter) {
-    const result = albums.filter((album) => album.name[0].toLowerCase() === letter || album.name[0].toUpperCase() === letter);
-    return result;
-}
-
-function getAlbumsAvgPrice(albums) {
-    let priceSum = 0;
-    for (const album of albums) {
-        priceSum += album.price;
-    }
-    return Math.round(priceSum / albums.length * 100) / 100;
-}
-
-function createToolBar() {
-    const toolsDiv = createNewTextElement("div", "tools", "");
-    const numberInput = document.createElement("input");
-    const letterInput = document.createElement("input");
-    const searchBtn = createNewTextElement("button", "", "Search");
-    toolsDiv.appendChild(numberInput);
-    toolsDiv.appendChild(letterInput);
-    toolsDiv.appendChild(searchBtn);
-    document.body.prepend(toolsDiv);
-    handlerOfSearch(searchBtn, numberInput, letterInput);
-}
-
-function handlerOfSearch(button, numberInput, letterInput) {
+function createProducts(cars) {
     const root = document.getElementById("root");
-    button.addEventListener("click", function() {
-        root.innerHTML = "";
-        createAlbums(getAlbumsStartingWith(getAlbumsLessThan(products, numberInput.value), letterInput.value), root);
+    const carsDiv = document.createElement("div");
+    carsDiv.id = "cars";
+
+    cars.forEach((car) => {
+        const div = document.createElement("div");
+        div.id = car.id;
+
+        const img = document.createElement("img");
+        img.src = car.image_url;
+        img.style.width = "200px";
+
+        const carName = document.createElement("h2");
+        carName.innerText = `${car.manufacturer} ${car.model}`;
+
+        const hp = document.createElement("p");
+        hp.innerText = `Horsepower: ${car.specs.horse_power} hp`;
+
+        const topSpeed = document.createElement("p");
+        topSpeed.innerText = `Top speed ${car.specs.top_speed_kmh} km/h`;
+
+        const accelTime = document.createElement("p");
+        accelTime.innerText = `0-100 km/h: ${car.specs.acceleration_0_100} sec`;
+
+        const price = document.createElement("p");
+        price.innerHTML = `<strong>${car.price_usd} $</strong>`;
+
+        const buyButton = document.createElement("button");
+        buyButton.innerText = "Buy";
+        buyButton.dataset.buttonId = car.id;
+
+        div.append(img, carName, hp, topSpeed, accelTime, price, buyButton);
+        carsDiv.appendChild(div);
+    });
+
+    root.appendChild(carsDiv);
+}
+
+function createSessionStorage() {
+    if (!sessionStorage.getItem("cart")) {
+        sessionStorage.setItem("cart", JSON.stringify([]));
+    }
+}
+
+function handlerOfBuyButton(products) {
+    const buttons = document.querySelectorAll("[data-button-id]");
+    buttons.forEach((button) => {
+        button.addEventListener("click", function() {
+            const storage = JSON.parse(sessionStorage.getItem("cart"));
+            const id = Number(button.dataset.buttonId);
+            const productToSave = products.find((product) => product.id === id);
+            storage.push(productToSave);
+            sessionStorage.setItem("cart", JSON.stringify(storage));
+        });
     });
 }
 
-const loadEvent = function() {
-    addRoot();
-    const root = document.getElementById("root");
-    createAlbums(products, root);
-    console.log(getAlbumsStartingWith(getAlbumsLessThan(products, 1000), "T"));
-    console.log(getAlbumsAvgPrice(products));
-    createToolBar();
-};
 
-window.addEventListener("load", loadEvent);
+function createToolBar() {
+    const div = document.createElement("div");
+    div.id = "toolbar";
+
+    const cartButton = document.createElement("button");
+    cartButton.id = "cart";
+    cartButton.innerText = "Cart";
+
+
+    div.append(cartButton);
+    document.body.prepend(div);
+}
+
+function handlerOfCartButton() {
+    const button = document.getElementById("cart");
+    const url = "/cart";
+    button.addEventListener("click", function() {
+        window.location.assign(url);
+    });
+}
+
+async function fetchData(url) {
+    try {
+        const response = await fetch(url);
+        return await response.json();
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+async function main() {
+    const cars = await fetchData(CARSURL);
+    createProducts(cars);
+    createSessionStorage();
+    handlerOfBuyButton(cars);
+    createToolBar();
+    handlerOfCartButton();
+}
+
+window.addEventListener("load", main);
